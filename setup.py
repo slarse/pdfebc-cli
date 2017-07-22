@@ -18,7 +18,7 @@ setup(
     author='Simon Larsén',
     author_email='slarse@kth.se',
     url='https://github.com/slarse/pdfebc-cli',
-    #download_url='https://github.com/slarse/{cookiecutter.project_name}/archive/v0.1.0.tar.gz',
+    #download_url='https://github.com/slarse/pdfebc-cli/archive/v0.1.0.tar.gz',
     license=license,
     packages=find_packages(exclude=('tests', 'docs')),
     tests_require=test_requirements,

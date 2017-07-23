@@ -7,6 +7,8 @@ import os
 import shutil
 import smtplib
 import sys
+import asyncio
+import itertools
 from pdfebc_core import config_utils, email_utils, compress
 from tqdm import tqdm
 from . import cli
@@ -51,7 +53,9 @@ def main():
             # TODO Add step-by-step config creation here.
             pass
         try:
-            email_utils.send_files_preconf(filepaths)
+            loop = asyncio.get_event_loop()
+            loop.run_until_complete(email_supervisor(filepaths))
+            print(email_utils.FILES_SENT)
         except smtplib.SMTPAuthenticationError as e:
             cli.status_callback(AUTH_ERROR.format(e.smtp_code, e.smtp_error))
         except Exception as e:
@@ -77,6 +81,62 @@ def compress_files(srcdir, outdir, ghostscript):
                      amount_of_files), total=amount_of_files)]
     return filepaths
 
+async def working_animation(msg):
+    """Print an animation to stdout.
+
+    Args:
+        msg (str): A message to come after the animation.
+    """
+    write, flush = sys.stdout.write, sys.stdout.flush
+    erase = lambda s: write('\x08' * len(s))
+    right_arrows = reversed(sorted(set(itertools.permutations('>     '))))
+    left_arrows = sorted(set(itertools.permutations('<     ')))
+    arrow_bars = itertools.chain(right_arrows, left_arrows)
+    for arrow_bar in itertools.cycle(arrow_bars):
+        status = ''.join(arrow_bar) + ' ' + msg
+        write(status)
+        flush()
+        erase(status)
+        try:
+            await asyncio.sleep(.1)
+        except asyncio.CancelledError:
+            break
+    erase(status)
+
+async def send_files(filepaths):
+    """Send the files with the settings in the config.
+
+    Args:
+        filepaths List[str]: A list of filepaths.
+    """
+    config = config_utils.read_config()
+    args = (email_utils.get_attribute_from_config(config, email_utils.EMAIL_SECTION_KEY, attribute)
+            for attribute in [email_utils.USER_KEY, email_utils.RECEIVER_KEY,
+                              email_utils.SMTP_SERVER_KEY, email_utils.SMTP_PORT_KEY])
+    args = itertools.chain(args, ['\n'.join(filepaths)])
+#    print(email_utils.SENDING_PRECONF.format(*args))
+    await email_utils.send_files_preconf(filepaths)
+#    print(email_utils.FILES_SENT)
+
+async def supervisor(work_func, animation_func):
+    """Show the animation on standard out while the async function runs.
+
+    Args:
+        work_func (asyncio.coroutine): Any asynchronous function.
+        animation_func (asyncio.coroutine): An asynchronous function that prints an animation
+        to stdout.
+    """
+    animation = asyncio.ensure_future(animation_func())
+    await work_func()
+    animation.cancel()
+
+async def email_supervisor(filepaths):
+    animation = asyncio.ensure_future(working_animation('Sending files ...'))
+    await send_files(filepaths)
+    animation.cancel()
+
+async def slow_func():
+    await asyncio.sleep(3)
 
 if __name__ == '__main__':
     main()

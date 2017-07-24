@@ -8,7 +8,7 @@ with open('LICENSE') as f:
     license = f.read()
 
 test_requirements = ['pytest>=3.1.1', 'pytest-cov>=2.5.1', 'codecov']
-required = []
+required = ['pdfebc-core>=0.3.0', 'tqdm']
 
 setup(
     name='pdfebc-cli',
